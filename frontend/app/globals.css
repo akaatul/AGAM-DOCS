@@ -1,0 +1,213 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import Valentine's theme fonts */
+@import url('https://fonts.googleapis.com/css2?family=Pacifico&family=Nunito:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 255, 240, 245;
+  --background-end-rgb: 255, 209, 220;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  min-height: 100vh;
+  font-family: 'Nunito', sans-serif;
+  cursor: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z' fill='%23FF8BA7'/%3E%3C/svg%3E"), auto;
+}
+
+/* Custom heart shape */
+.heart {
+  position: relative;
+  width: 100px;
+  height: 90px;
+}
+
+.heart::before,
+.heart::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 52px;
+  height: 80px;
+  border-radius: 50px 50px 0 0;
+  background: #FF8BA7;
+}
+
+.heart::before {
+  left: 50px;
+  transform: rotate(-45deg);
+  transform-origin: 0 100%;
+}
+
+.heart::after {
+  left: 0;
+  transform: rotate(45deg);
+  transform-origin: 100% 100%;
+}
+
+/* Sparkle effect */
+.sparkle {
+  position: relative;
+}
+
+.sparkle::before {
+  content: "✦";
+  position: absolute;
+  animation: sparkle 2s ease-in-out infinite;
+  color: #FFD700;
+}
+
+/* Love letter effect */
+.love-letter {
+  position: relative;
+  background-color: #FFF0F5;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.love-letter::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 30px;
+  height: 30px;
+  background-color: #FF8BA7;
+  transform: rotate(45deg);
+  z-index: -1;
+}
+
+/* Ribbon border */
+.ribbon-border {
+  position: relative;
+  border: 2px solid #FF8BA7;
+  border-radius: 8px;
+}
+
+.ribbon-border::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 20px;
+  background-color: #FF8BA7;
+  border-radius: 50% 50% 0 0;
+}
+
+/* Floating hearts */
+.floating-heart {
+  position: absolute;
+  font-size: 20px;
+  color: #FF8BA7;
+  pointer-events: none;
+  animation: fall 10s linear forwards;
+}
+
+/* Rose petals */
+.rose-petal {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-color: #FF8BA7;
+  border-radius: 50% 0 50% 0;
+  transform: rotate(45deg);
+  pointer-events: none;
+  animation: fall 8s linear forwards;
+}
+
+/* Love potion glow */
+.love-potion-glow {
+  box-shadow: 0 0 15px #FF8BA7, 0 0 30px #FF8BA7;
+  transition: box-shadow 0.3s ease;
+}
+
+.love-potion-glow:hover {
+  box-shadow: 0 0 20px #FF8BA7, 0 0 40px #FF8BA7;
+}
+
+/* Golden ink effect */
+.golden-ink {
+  background: linear-gradient(to right, #FFD700, #FFA500);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FFF0F5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #FF8BA7;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FF6B95;
+}
+
+/* Heartbeat animation */
+@keyframes heartbeat {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.2);
+  }
+  40% {
+    transform: scale(1);
+  }
+  60% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-heartbeat {
+  animation: heartbeat 1.5s infinite;
+  display: inline-block;
+}
+
+/* Fall animation for floating hearts and petals */
+@keyframes fall {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* Sparkle animation */
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+} 
