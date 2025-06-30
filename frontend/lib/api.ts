@@ -1,26 +1,14 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = 'https://agam-backend.onrender.com/api';
+
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  responseType: 'blob', // Default to blob for file downloads
 });
-
-// Helper function to trigger file download
-const downloadFile = (blob: Blob, filename: string) => {
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', filename);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
-};
 
 export interface ProcessedFile {
   id: string;
@@ -69,60 +57,20 @@ export const uploadFileForConversion = async (file: File, operation: string): Pr
   return response.data;
 };
 
-export const convertToPdf = async (file: File): Promise<void> => {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await apiClient.post('/convert-to-pdf/', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-
-  const filename = file.name.replace(/\.[^/.]+$/, '') + '.pdf';
-  downloadFile(response.data, filename);
+export const convertToPdf = async (file: File): Promise<ProcessedFile> => {
+  return uploadFileForConversion(file, 'convert_to_pdf');
 };
 
-export const convertPdfToDocx = async (file: File): Promise<void> => {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await apiClient.post('/pdf-to-docx/', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-
-  const filename = file.name.replace(/\.pdf$/, '.docx');
-  downloadFile(response.data, filename);
+export const convertPdfToDocx = async (file: File): Promise<ProcessedFile> => {
+  return uploadFileForConversion(file, 'pdf_to_docx');
 };
 
-export const convertPdfToTxt = async (file: File): Promise<void> => {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await apiClient.post('/pdf-to-txt/', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-
-  const filename = file.name.replace(/\.pdf$/, '.txt');
-  downloadFile(response.data, filename);
+export const convertPdfToTxt = async (file: File): Promise<ProcessedFile> => {
+  return uploadFileForConversion(file, 'pdf_to_txt');
 };
 
-export const convertPdfToPptx = async (file: File): Promise<void> => {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await apiClient.post('/pdf-to-pptx/', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-
-  const filename = file.name.replace(/\.pdf$/, '.pptx');
-  downloadFile(response.data, filename);
+export const convertPdfToPptx = async (file: File): Promise<ProcessedFile> => {
+  return uploadFileForConversion(file, 'pdf_to_pptx');
 };
 
 export const convertExcelToPdf = async (file: File): Promise<ProcessedFile> => {
@@ -130,7 +78,7 @@ export const convertExcelToPdf = async (file: File): Promise<ProcessedFile> => {
 };
 
 // File merging functions
-export const mergeFiles = async (files: File[], outputFilename: string): Promise<void> => {
+export const mergeFiles = async (files: File[], outputFilename: string): Promise<MergeJob> => {
   const formData = new FormData();
   
   files.forEach(file => {
@@ -139,22 +87,17 @@ export const mergeFiles = async (files: File[], outputFilename: string): Promise
   
   formData.append('output_filename', outputFilename);
 
-  const response = await apiClient.post('/merge/', formData, {
+  const response = await apiClient.post<MergeJob>('/merge/', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   });
 
-  const extension = files[0].name.split('.').pop() || '';
-  const filename = outputFilename.endsWith(`.${extension}`) 
-    ? outputFilename 
-    : `${outputFilename}.${extension}`;
-  
-  downloadFile(response.data, filename);
+  return response.data;
 };
 
 // Images to PDF function
-export const imagesToPdf = async (images: File[], outputFilename: string): Promise<void> => {
+export const imagesToPdf = async (images: File[], outputFilename: string): Promise<MergeJob> => {
   const formData = new FormData();
   
   images.forEach(image => {
@@ -163,14 +106,13 @@ export const imagesToPdf = async (images: File[], outputFilename: string): Promi
   
   formData.append('output_filename', outputFilename);
 
-  const response = await apiClient.post('/images-to-pdf/', formData, {
+  const response = await apiClient.post<MergeJob>('/images-to-pdf/', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   });
 
-  const filename = outputFilename.endsWith('.pdf') ? outputFilename : `${outputFilename}.pdf`;
-  downloadFile(response.data, filename);
+  return response.data;
 };
 
 // File status check functions
