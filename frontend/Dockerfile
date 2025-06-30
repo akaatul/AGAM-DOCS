@@ -1,34 +1,34 @@
-# Use Node.js base image
-FROM node:18-alpine
+# Stage 1: Build
+FROM node:18-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy dependency files
+# Copy package files and install dependencies
 COPY package*.json ./
-
-# Install dependencies
 RUN npm install
 
-# Copy all files
+# Copy the full app and build
 COPY . .
-
-# Build the app with standalone output
 RUN npm run build
 
-# Change directory to the standalone output folder
-WORKDIR /app/.next/standalone
+# Stage 2: Production Image
+FROM node:18-alpine AS runner
 
-# Copy static files
-COPY --from=0 /app/public ./public
-COPY --from=0 /app/.next/static ./.next/static
+WORKDIR /app
+
+# Copy standalone build from builder stage
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3000
 
 # Expose port
 EXPOSE 3000
 
-# Set env vars
-ENV PORT=3000
-ENV NODE_ENV=production
-
-# Run Next.js production server
+# Start the Next.js app
 CMD ["node", "server.js"]
