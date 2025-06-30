@@ -60,7 +60,7 @@ class FileUploadSerializer(serializers.Serializer):
     """Serializer for file upload"""
     
     file = serializers.FileField()
-    operation = serializers.CharField(max_length=20)
+    operation = serializers.CharField(max_length=20, required=False)
     
     def validate_file(self, value):
         # Check file size (25MB limit)
@@ -98,7 +98,7 @@ class MergeFilesSerializer(serializers.Serializer):
         min_length=2,
         max_length=20
     )
-    output_filename = serializers.CharField(max_length=255)
+    output_filename = serializers.CharField(max_length=255, required=False)
     
     def validate_files(self, files):
         if not files:
