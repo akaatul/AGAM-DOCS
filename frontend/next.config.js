@@ -1,12 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
+    NEXT_PUBLIC_API_URL: 'https://agam-backend.onrender.com/api',
   },
   reactStrictMode: true,
   swcMinify: true,
   images: {
-    domains: ['localhost', 'agam-backend.onrender.com'],
+    domains: ['agam-backend.onrender.com'],
   },
   output: 'standalone',
 }
