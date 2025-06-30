@@ -150,7 +150,10 @@ export default function ImagesToPdfPage() {
                 multiple={true}
                 maxFiles={20}
                 className="mb-6"
-                acceptedFileTypes={['png', 'jpg', 'jpeg']}
+                accept={{
+                  'image/png': ['.png'],
+                  'image/jpeg': ['.jpg', '.jpeg']
+                }}
               />
               
               {images.length > 0 && (

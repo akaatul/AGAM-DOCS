@@ -134,7 +134,7 @@ export default function ConvertPage() {
                 'text/plain': ['.txt']
               }}
               maxFiles={1}
-              maxSize={25 * 1024 * 1024} // 25MB
+              maxSizeMB={25}
             />
             
             {file && (

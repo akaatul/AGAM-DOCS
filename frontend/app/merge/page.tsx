@@ -206,7 +206,11 @@ export default function MergePage() {
                 multiple={true}
                 maxFiles={10}
                 className="mb-6"
-                acceptedFileTypes={['pdf', 'docx', 'pptx']}
+                accept={{
+                  'application/pdf': ['.pdf'],
+                  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+                  'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx']
+                }}
               />
               
               {errorMessage && (

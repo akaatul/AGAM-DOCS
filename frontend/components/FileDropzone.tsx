@@ -7,13 +7,17 @@ import { FaCloudUploadAlt, FaCheckCircle, FaTimesCircle, FaHeart, FaEnvelope } f
 import { formatBytes, isSupportedFileType, isValidFileSize } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
+type AcceptProp = {
+  [key: string]: string[];
+};
+
 interface FileDropzoneProps {
   onFilesAccepted: (files: File[]) => void;
   multiple?: boolean;
   maxFiles?: number;
   maxSizeMB?: number;
   className?: string;
-  acceptedFileTypes?: string[];
+  accept?: AcceptProp;
 }
 
 // Custom wrapper component to handle drag and drop events
@@ -37,7 +41,16 @@ export default function FileDropzone({
   maxFiles = 10,
   maxSizeMB = 25,
   className = '',
-  acceptedFileTypes = ['docx', 'pptx', 'xlsx', 'xls', 'txt', 'png', 'jpg', 'jpeg', 'pdf']
+  accept = {
+    'application/pdf': ['.pdf'],
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+    'application/vnd.ms-excel': ['.xls'],
+    'text/plain': ['.txt'],
+    'image/png': ['.png'],
+    'image/jpeg': ['.jpg', '.jpeg']
+  }
 }: FileDropzoneProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [showHearts, setShowHearts] = useState(false);
@@ -68,13 +81,7 @@ export default function FileDropzone({
     
     // Filter valid files
     const validFiles = acceptedFiles.filter(file => {
-      const isSupported = isSupportedFileType(file.name);
       const isValidSize = isValidFileSize(file, maxSizeMB);
-      
-      if (!isSupported) {
-        toast.error(`File ${file.name} has an unsupported format`);
-        return false;
-      }
       
       if (!isValidSize) {
         toast.error(`File ${file.name} exceeds the ${maxSizeMB}MB limit`);
@@ -118,16 +125,7 @@ export default function FileDropzone({
     multiple,
     maxFiles,
     maxSize: maxSizeMB * 1024 * 1024,
-    accept: {
-      'application/pdf': ['.pdf'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'application/vnd.ms-excel': ['.xls'],
-      'text/plain': ['.txt'],
-      'image/png': ['.png'],
-      'image/jpeg': ['.jpg', '.jpeg']
-    }
+    accept
   });
   
   const removeFile = (index: number) => {
@@ -198,61 +196,47 @@ export default function FileDropzone({
           )}
         </motion.div>
         
-        <p className="text-lg font-medium text-gray-700 font-cursive">
-          {isDragActive
-            ? 'Drop the love letters here...'
-            : `Drag & drop ${multiple ? 'files' : 'a file'} here, or click to select`}
-        </p>
-        <p className="text-sm text-gray-500 mt-2">
-          Supported formats: {acceptedFileTypes.join(', ')}
-        </p>
-        <p className="text-sm text-gray-500 mt-1">
-          Max file size: {maxSizeMB}MB
-        </p>
+        <div className="text-center">
+          <p className="text-lg font-medium text-primary-600 mb-2">
+            {isDragActive ? (
+              "Drop your files here..."
+            ) : (
+              "Drag & drop your files here"
+            )}
+          </p>
+          <p className="text-sm text-gray-500">
+            or click to browse
+          </p>
+          <p className="text-xs text-gray-400 mt-2">
+            Max file size: {maxSizeMB}MB
+          </p>
+        </div>
       </DropzoneMotionDiv>
       
+      {/* Display uploaded files */}
       {files.length > 0 && (
-        <motion.div 
-          className="mt-4"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <h3 className="text-lg font-medium text-primary-600 mb-2 font-cursive">Selected Files:</h3>
-          <ul className="space-y-2">
-            {files.map((file, index) => (
-              <motion.li 
-                key={`${file.name}-${index}`}
-                className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm border border-primary-200"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
-                whileHover={{ scale: 1.01, backgroundColor: '#FFF0F5' }}
-              >
-                <div className="flex items-center">
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ duration: 1, repeat: Infinity, repeatDelay: 1 }}
-                  >
-                    <FaHeart className="text-primary-500 mr-2" />
-                  </motion.div>
-                  <span className="truncate max-w-xs">{file.name}</span>
-                  <span className="ml-2 text-sm text-gray-500">({formatBytes(file.size)})</span>
+        <div className="mt-4 space-y-2">
+          {files.map((file, index) => (
+            <div
+              key={index}
+              className="flex items-center justify-between p-3 bg-white rounded-lg border border-primary-100"
+            >
+              <div className="flex items-center">
+                <FaCheckCircle className="text-primary-500 mr-2" />
+                <div>
+                  <p className="text-sm font-medium text-gray-700">{file.name}</p>
+                  <p className="text-xs text-gray-500">{formatBytes(file.size)}</p>
                 </div>
-                <motion.button 
-                  type="button"
-                  onClick={() => removeFile(index)}
-                  className="text-primary-500 hover:text-primary-700 transition-colors"
-                  whileHover={{ scale: 1.2, rotate: 10 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <FaTimesCircle />
-                </motion.button>
-              </motion.li>
-            ))}
-          </ul>
-        </motion.div>
+              </div>
+              <button
+                onClick={() => removeFile(index)}
+                className="text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <FaTimesCircle />
+              </button>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
