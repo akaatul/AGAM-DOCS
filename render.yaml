@@ -3,7 +3,8 @@ services:
     name: agam-frontend
     env: docker
     plan: free
-    dockerfilePath: ./frontend/Dockerfile
+    rootDir: frontend           # 👈 add this
+    dockerfilePath: Dockerfile # 👈 remove ./frontend/ prefix
     envVars:
       - key: NODE_ENV
         value: production
@@ -12,7 +13,8 @@ services:
     name: agam-backend
     env: docker
     plan: free
-    dockerfilePath: ./backend/Dockerfile
+    rootDir: backend            # 👈 add this
+    dockerfilePath: Dockerfile # 👈 remove ./backend/ prefix
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: agam.settings
