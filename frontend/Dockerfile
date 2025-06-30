@@ -1,25 +1,34 @@
+# Use Node.js base image
 FROM node:18-alpine
 
+# Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json
+# Copy dependency files
 COPY package*.json ./
 
 # Install dependencies
 RUN npm install
 
-# Copy the rest of the application
+# Copy all files
 COPY . .
 
-# Build the application
+# Build the app with standalone output
 RUN npm run build
+
+# Change directory to the standalone output folder
+WORKDIR /app/.next/standalone
+
+# Copy static files
+COPY --from=0 /app/public ./public
+COPY --from=0 /app/.next/static ./.next/static
 
 # Expose port
 EXPOSE 3000
 
-# Set environment variable for the port
+# Set env vars
 ENV PORT=3000
 ENV NODE_ENV=production
 
-# Start the application in production mode
-CMD ["npm", "start"] 
+# Run Next.js production server
+CMD ["node", "server.js"]
