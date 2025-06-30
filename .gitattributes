@@ -1,0 +1,47 @@
+# Set default to LF for text files
+* text=auto eol=lf
+
+# Handle specific binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.doc binary
+*.docx binary
+*.ppt binary
+*.pptx binary
+*.xls binary
+*.xlsx binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.mp3 binary
+*.wav binary
+*.mp4 binary
+
+# Handle common source code/text files
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.jsx text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+*.env text eol=lf
+*.Dockerfile text eol=lf
+
+# Ignore venv (virtual environments) completely
+backend/venv/** -text
+
+# Lock file formats
+package-lock.json text eol=lf
+poetry.lock text eol=lf
+Pipfile.lock text eol=lf
