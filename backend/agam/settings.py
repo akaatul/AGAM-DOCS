@@ -41,6 +41,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+CORS_ALLOWED_ORIGINS = [
+    "https://agam-frontend.onrender.com",
+]
+
 ROOT_URLCONF = 'agam.urls'
 
 TEMPLATES = [
