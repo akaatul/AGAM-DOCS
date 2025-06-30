@@ -8,10 +8,12 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 3000
       - key: NEXT_PUBLIC_API_URL
-        value: https://agam-backend.onrender.com/api
+        fromService:
+          type: web
+          name: agam-backend
+          property: host
+        sync: false
 
   - type: web
     name: agam-backend
@@ -23,10 +25,32 @@ services:
       - key: DJANGO_SETTINGS_MODULE
         value: agam.settings
       - key: SECRET_KEY
-        value: your-secret-key
+        generateValue: true
       - key: ALLOWED_HOSTS
         value: .onrender.com,localhost
       - key: DEBUG
-        value: False
+        value: false
       - key: PORT
         value: 8000
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: agam-db
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: agam-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: agam-db
+          property: password
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: agam-db
+          property: host
+      - key: POSTGRES_PORT
+        value: 5432
+
+databases:
+  - name: agam-db
+    plan: free
