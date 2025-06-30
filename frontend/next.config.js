@@ -6,8 +6,9 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   images: {
-    domains: ['localhost'],
+    domains: ['localhost', 'agam-backend.onrender.com'],
   },
+  output: 'standalone',
 }
 
 module.exports = nextConfig 

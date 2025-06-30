@@ -3,22 +3,30 @@ services:
     name: agam-frontend
     env: docker
     plan: free
-    rootDir: frontend           # 👈 add this
-    dockerfilePath: Dockerfile # 👈 remove ./frontend/ prefix
+    rootDir: frontend
+    dockerfilePath: Dockerfile
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 3000
+      - key: NEXT_PUBLIC_API_URL
+        value: https://agam-backend.onrender.com/api
 
   - type: web
     name: agam-backend
     env: docker
     plan: free
-    rootDir: backend            # 👈 add this
-    dockerfilePath: Dockerfile # 👈 remove ./backend/ prefix
+    rootDir: backend
+    dockerfilePath: Dockerfile
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: agam.settings
       - key: SECRET_KEY
         value: your-secret-key
       - key: ALLOWED_HOSTS
-        value: 0.0.0.0,localhost
+        value: .onrender.com,localhost
+      - key: DEBUG
+        value: False
+      - key: PORT
+        value: 8000

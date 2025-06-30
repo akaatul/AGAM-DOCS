@@ -19,8 +19,11 @@ COPY . .
 # Create media and static directories
 RUN mkdir -p media/temp media/uploads media/processed media/merged media/merge_files staticfiles
 
+# Collect static files
+RUN python manage.py collectstatic --noinput
+
 # Expose port
 EXPOSE 8000
 
-# Run server
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"] 
+# Run gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "agam.wsgi:application"] 
