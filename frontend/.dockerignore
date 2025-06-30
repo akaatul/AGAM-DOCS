@@ -4,6 +4,7 @@ node_modules/
 .pnp.js
 yarn.lock
 package-lock.json
+.next
 
 # Testing
 /coverage
@@ -50,6 +51,7 @@ yarn-error.log*
 # Docker
 Dockerfile
 .dockerignore
+*.log
 
 # TypeScript
 *.tsbuildinfo
