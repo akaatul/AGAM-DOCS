@@ -4,8 +4,6 @@ services:
     env: docker
     plan: free
     dockerfilePath: ./frontend/Dockerfile
-    buildCommand: npm install
-    startCommand: npm run dev
     envVars:
       - key: NODE_ENV
         value: production
@@ -15,8 +13,6 @@ services:
     env: docker
     plan: free
     dockerfilePath: ./backend/Dockerfile
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn agam.wsgi:application --bind 0.0.0.0:8000
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: agam.settings
