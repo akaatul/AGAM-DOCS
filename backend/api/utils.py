@@ -17,6 +17,7 @@ import shutil
 import logging
 from pptx import Presentation
 import openpyxl
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -617,4 +618,189 @@ def merge_images_to_pdf(image_paths, output_path=None):
         append_images=images[1:]
     )
     
-    return output_path 
+    return output_path
+
+# Function to process files without database dependency
+def process_file_without_db(uploaded_file, operation):
+    """
+    Process a file without requiring database access
+    
+    Args:
+        uploaded_file: The uploaded file object
+        operation: The operation to perform (e.g., 'convert_to_pdf')
+    
+    Returns:
+        tuple: (output_path, output_filename)
+    """
+    try:
+        # Create temp directory if it doesn't exist
+        temp_dir = get_temp_dir()
+        
+        # Save uploaded file to temp location
+        timestamp = int(time.time())
+        temp_input_path = os.path.join(temp_dir, f"input_{timestamp}_{uploaded_file.name}")
+        
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(temp_input_path), exist_ok=True)
+        
+        # Save the uploaded file
+        with open(temp_input_path, 'wb+') as destination:
+            for chunk in uploaded_file.chunks():
+                destination.write(chunk)
+        
+        # Get file extension
+        file_name = uploaded_file.name
+        extension = file_name.split('.')[-1].lower()
+        
+        # Process based on operation
+        if operation == 'convert_to_pdf':
+            # Check if file is already a PDF
+            if extension == 'pdf':
+                return temp_input_path, file_name
+            
+            # Convert to PDF
+            output_path = convert_to_pdf(temp_input_path)
+            output_filename = f"{os.path.splitext(file_name)[0]}.pdf"
+            
+        elif operation == 'pdf_to_docx':
+            # Check if file is a PDF
+            if extension != 'pdf':
+                raise ValueError('Only PDF files can be converted to DOCX')
+            
+            # Convert PDF to DOCX
+            output_path = pdf_to_docx(temp_input_path)
+            output_filename = f"{os.path.splitext(file_name)[0]}.docx"
+            
+        elif operation == 'pdf_to_txt':
+            # Check if file is a PDF
+            if extension != 'pdf':
+                raise ValueError('Only PDF files can be converted to TXT')
+            
+            # Convert PDF to TXT
+            output_path = pdf_to_txt(temp_input_path)
+            output_filename = f"{os.path.splitext(file_name)[0]}.txt"
+            
+        elif operation == 'pdf_to_pptx':
+            if extension != 'pdf':
+                raise ValueError('Only PDF files can be converted to PPTX')
+            
+            # Convert PDF to PPTX
+            output_path = pdf_to_pptx(temp_input_path)
+            output_filename = f"{os.path.splitext(file_name)[0]}.pptx"
+            
+        else:
+            raise ValueError(f'Unsupported operation: {operation}')
+        
+        return output_path, output_filename
+        
+    except Exception as e:
+        logger.error(f"Error processing file without DB: {str(e)}")
+        raise e
+    finally:
+        # Clean up input file
+        try:
+            if 'temp_input_path' in locals() and os.path.exists(temp_input_path):
+                os.remove(temp_input_path)
+        except Exception as e:
+            logger.error(f"Error cleaning up temp file: {str(e)}")
+
+# Function to process multiple images to PDF without database dependency
+def process_images_to_pdf_without_db(files, output_filename):
+    """
+    Process multiple images to create a PDF without requiring database access
+    
+    Args:
+        files: List of uploaded file objects
+        output_filename: Name for the output file
+    
+    Returns:
+        tuple: (output_path, output_filename)
+    """
+    try:
+        # Create temp directory if it doesn't exist
+        temp_dir = get_temp_dir()
+        timestamp = int(time.time())
+        
+        # Save uploaded files to temp location
+        file_paths = []
+        for i, file in enumerate(files):
+            temp_path = os.path.join(temp_dir, f"img_{timestamp}_{i}_{file.name}")
+            
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+            
+            # Save the uploaded file
+            with open(temp_path, 'wb+') as destination:
+                for chunk in file.chunks():
+                    destination.write(chunk)
+            
+            file_paths.append(temp_path)
+        
+        # Merge images to PDF
+        output_path = merge_images_to_pdf(file_paths)
+        final_output_filename = f"{output_filename}.pdf"
+        
+        return output_path, final_output_filename
+        
+    except Exception as e:
+        logger.error(f"Error processing images to PDF without DB: {str(e)}")
+        raise e
+    finally:
+        # Clean up input files
+        for path in file_paths if 'file_paths' in locals() else []:
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception as e:
+                logger.error(f"Error cleaning up temp file {path}: {str(e)}")
+
+# Function to merge files without database dependency
+def merge_files_without_db(files, output_filename, file_type):
+    """
+    Merge multiple files without requiring database access
+    
+    Args:
+        files: List of uploaded file objects
+        output_filename: Name for the output file
+        file_type: Type of files being merged (pdf, docx, pptx)
+    
+    Returns:
+        tuple: (output_path, output_filename)
+    """
+    try:
+        # Create temp directory if it doesn't exist
+        temp_dir = get_temp_dir()
+        timestamp = int(time.time())
+        
+        # Save uploaded files to temp location
+        file_paths = []
+        for i, file in enumerate(files):
+            temp_path = os.path.join(temp_dir, f"merge_{timestamp}_{i}_{file.name}")
+            
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+            
+            # Save the uploaded file
+            with open(temp_path, 'wb+') as destination:
+                for chunk in file.chunks():
+                    destination.write(chunk)
+            
+            file_paths.append(temp_path)
+        
+        # Merge files
+        output_path = merge_files(file_paths, output_filename, file_type)
+        final_output_filename = f"{output_filename}.{file_type}"
+        
+        return output_path, final_output_filename
+        
+    except Exception as e:
+        logger.error(f"Error merging files without DB: {str(e)}")
+        raise e
+    finally:
+        # Clean up input files
+        for path in file_paths if 'file_paths' in locals() else []:
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception as e:
+                logger.error(f"Error cleaning up temp file {path}: {str(e)}") 

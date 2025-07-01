@@ -15,7 +15,9 @@ from .serializers import (
 from .utils import (
     get_file_extension, convert_to_pdf, pdf_to_docx,
     pdf_to_txt, merge_files, clean_temp_files, 
-    merge_images_to_pdf, pdf_to_pptx
+    merge_images_to_pdf, pdf_to_pptx,
+    process_file_without_db, process_images_to_pdf_without_db,
+    merge_files_without_db
 )
 
 
@@ -31,33 +33,37 @@ class FileUploadView(APIView):
         uploaded_file = serializer.validated_data['file']
         operation = serializer.validated_data['operation']
         
-        # Get file extension
-        file_name = uploaded_file.name
-        extension = file_name.split('.')[-1].lower()
-        
-        # Create a ProcessedFile instance
-        processed_file = ProcessedFile.objects.create(
-            original_filename=file_name,
-            file_type=extension,
-            file=uploaded_file,
-            operation=operation,
-            status='processing'
-        )
-        
-        # Start processing in a separate thread
-        thread = threading.Thread(
-            target=self._process_file,
-            args=(processed_file, operation)
-        )
-        thread.daemon = True
-        thread.start()
-        
-        # Return the created instance
-        serializer = ProcessedFileSerializer(
-            processed_file, 
-            context={'request': request}
-        )
-        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+        try:
+            # Get file extension
+            file_name = uploaded_file.name
+            extension = file_name.split('.')[-1].lower()
+            
+            # Create a ProcessedFile instance
+            processed_file = ProcessedFile.objects.create(
+                original_filename=file_name,
+                file_type=extension,
+                file=uploaded_file,
+                operation=operation,
+                status='processing'
+            )
+            
+            # Start processing in a separate thread
+            thread = threading.Thread(
+                target=self._process_file,
+                args=(processed_file, operation)
+            )
+            thread.daemon = True
+            thread.start()
+            
+            # Return the created instance
+            serializer = ProcessedFileSerializer(
+                processed_file, 
+                context={'request': request}
+            )
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+        except Exception as e:
+            # If database connection fails, use the no-DB fallback
+            return FileProcessNoDBView().post(request)
     
     def _process_file(self, processed_file, operation):
         """Process the file based on the operation"""
@@ -178,6 +184,50 @@ class FileUploadView(APIView):
             clean_temp_files()
 
 
+class FileProcessNoDBView(APIView):
+    """View for handling file processing without database dependency"""
+    
+    def post(self, request):
+        serializer = FileUploadSerializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        uploaded_file = serializer.validated_data['file']
+        operation = serializer.validated_data['operation']
+        
+        try:
+            # Process the file without database
+            output_path, output_filename = process_file_without_db(uploaded_file, operation)
+            
+            # Return the file directly
+            response = FileResponse(
+                open(output_path, 'rb'),
+                content_type='application/octet-stream',
+                as_attachment=True,
+                filename=output_filename
+            )
+            
+            # Clean up after sending
+            response.close_callback = lambda: self._cleanup_file(output_path)
+            
+            return response
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _cleanup_file(self, file_path):
+        """Clean up the file after it's been sent"""
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            pass
+
+
 class MergeFilesView(APIView):
     """View for handling file merging"""
     
@@ -220,21 +270,20 @@ class MergeFilesView(APIView):
         if safe_output_filename != output_filename:
             output_filename = safe_output_filename
         
-        # Create a MergeJob instance
-        merge_job = MergeJob.objects.create(
-            output_filename=output_filename,
-            file_type=file_type,
-            status='processing'
-        )
-        
         try:
+            # Create a MergeJob instance
+            merge_job = MergeJob.objects.create(
+                output_filename=output_filename,
+                file_type=file_type,
+                status='processing'
+            )
+            
             # Save all files
-            for i, file in enumerate(files):
+            for file in files:
                 MergeFile.objects.create(
                     merge_job=merge_job,
                     original_filename=file.name,
-                    file=file,
-                    order=i
+                    file=file
                 )
             
             # Start processing in a separate thread
@@ -251,75 +300,47 @@ class MergeFilesView(APIView):
                 context={'request': request}
             )
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
-            
         except Exception as e:
-            # Clean up if there's an error during setup
-            merge_job.status = 'failed'
-            merge_job.error_message = f"Error during job setup: {str(e)}"
-            merge_job.save()
-            
-            return Response(
-                {'error': str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            # If database connection fails, use the no-DB fallback
+            return MergeFilesNoDBView().post(request)
     
     def _process_merge(self, merge_job):
-        """Process the file merge"""
-        import logging
-        logger = logging.getLogger(__name__)
-        
-        logger.info(f"Starting merge job {merge_job.id} for file type {merge_job.file_type}")
-        
+        """Process the merge job"""
         try:
-            # Get all files in order
-            merge_file_instances = merge_job.files.all().order_by('order')
+            # Get all files
+            merge_files = merge_job.files.all()
             
-            if not merge_file_instances:
-                raise ValueError("No files found to merge")
-                
-            file_paths = []
-            for file_instance in merge_file_instances:
-                file_path = file_instance.file.path
-                if not os.path.exists(file_path):
-                    raise ValueError(f"File not found: {file_path}")
-                file_paths.append(file_path)
+            if not merge_files:
+                merge_job.status = 'failed'
+                merge_job.error_message = 'No files found for processing'
+                merge_job.save()
+                return
             
-            logger.info(f"Merging {len(file_paths)} files for job {merge_job.id}")
+            # Get file paths
+            file_paths = [merge_file.file.path for merge_file in merge_files]
             
             # Merge files
             output_path = merge_files(
-                file_paths,
-                merge_job.output_filename,
+                file_paths, 
+                merge_job.output_filename, 
                 merge_job.file_type
             )
             
-            logger.info(f"Merge complete, output file at {output_path}")
+            output_filename = f"{merge_job.output_filename}.{merge_job.file_type}"
             
-            # Verify output file exists
-            if not os.path.exists(output_path):
-                raise ValueError(f"Merged file not found at {output_path}")
-            
-            # Update the merge job with the result
+            # Update the merge job
             with open(output_path, 'rb') as f:
-                output_filename = f"{merge_job.output_filename}.{merge_job.file_type}"
                 merge_job.merged_file.save(output_filename, f)
             
-            # Verify merged file was saved properly
-            if not merge_job.merged_file or not os.path.exists(merge_job.merged_file.path):
-                raise ValueError("Failed to save merged file to storage")
-            
             merge_job.status = 'completed'
-            logger.info(f"Merge job {merge_job.id} completed successfully")
             
             # Clean up temporary file
             try:
-                if os.path.exists(output_path):
-                    os.remove(output_path)
-            except Exception as cleanup_error:
-                logger.warning(f"Failed to clean up temporary file: {str(cleanup_error)}")
-        
+                os.remove(output_path)
+            except:
+                pass
+                
         except Exception as e:
-            logger.error(f"Error processing merge job {merge_job.id}: {str(e)}")
             merge_job.status = 'failed'
             merge_job.error_message = str(e)
         
@@ -329,126 +350,78 @@ class MergeFilesView(APIView):
             clean_temp_files()
 
 
-class ProcessedFileViewSet(viewsets.ReadOnlyModelViewSet):
-    """ViewSet for viewing processed files"""
+class MergeFilesNoDBView(APIView):
+    """View for handling file merging without database dependency"""
     
-    queryset = ProcessedFile.objects.all().order_by('-created_at')
-    serializer_class = ProcessedFileSerializer
-    
-    @action(detail=True, methods=['get'])
-    def download(self, request, pk=None):
-        """Download the processed file"""
-        processed_file = self.get_object()
+    def post(self, request):
+        serializer = MergeFilesSerializer(data=request.data)
         
-        if processed_file.status != 'completed' or not processed_file.processed_file:
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        files = serializer.validated_data['files']
+        output_filename = serializer.validated_data['output_filename']
+        
+        # Validate files
+        if not files or len(files) < 2:
             return Response(
-                {'error': 'Processed file not available'},
-                status=status.HTTP_404_NOT_FOUND
+                {'error': 'At least two files are required for merging'},
+                status=status.HTTP_400_BAD_REQUEST
             )
         
-        file_path = processed_file.processed_file.path
-        return FileResponse(
-            open(file_path, 'rb'),
-            as_attachment=True,
-            filename=processed_file.processed_filename
-        )
-
-
-class MergeJobViewSet(viewsets.ReadOnlyModelViewSet):
-    """ViewSet for viewing merge jobs"""
-    
-    queryset = MergeJob.objects.all().order_by('-created_at')
-    serializer_class = MergeJobSerializer
-    
-    @action(detail=True, methods=['get'])
-    def download(self, request, pk=None):
-        """Download the merged file"""
-        import logging
-        logger = logging.getLogger(__name__)
+        # Ensure all files are of the same type
+        file_types = {get_file_extension(file.name) for file in files}
+        if len(file_types) > 1:
+            return Response(
+                {'error': 'All files must be of the same type for merging'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get file type from the first file
+        file_type = get_file_extension(files[0].name).lower()
+        
+        # Check if file type is supported
+        if file_type not in ['pdf', 'docx', 'pptx']:
+            return Response(
+                {'error': f'File type {file_type} is not supported for merging. Only PDF, DOCX, and PPTX are supported.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Sanitize output filename
+        safe_output_filename = os.path.basename(output_filename)
+        if safe_output_filename != output_filename:
+            output_filename = safe_output_filename
         
         try:
-            merge_job = self.get_object()
+            # Process the merge without database
+            output_path, output_filename = merge_files_without_db(files, output_filename, file_type)
             
-            if merge_job.status != 'completed':
-                logger.warning(f"Attempted to download incomplete merge job: {merge_job.id}, status: {merge_job.status}")
-                return Response(
-                    {'error': f'Merge job is not completed. Current status: {merge_job.status}'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-                
-            if not merge_job.merged_file:
-                logger.error(f"Completed merge job {merge_job.id} has no merged file")
-                return Response(
-                    {'error': 'Merged file not available'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+            # Return the file directly
+            response = FileResponse(
+                open(output_path, 'rb'),
+                content_type='application/octet-stream',
+                as_attachment=True,
+                filename=output_filename
+            )
             
-            file_path = merge_job.merged_file.path
+            # Clean up after sending
+            response.close_callback = lambda: self._cleanup_file(output_path)
             
-            if not os.path.exists(file_path):
-                logger.error(f"Merged file for job {merge_job.id} not found at path: {file_path}")
-                return Response(
-                    {'error': 'Merged file not found on server'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-                
-            try:
-                response = FileResponse(
-                    open(file_path, 'rb'),
-                    as_attachment=True,
-                    filename=f"{merge_job.output_filename}.{merge_job.file_type}"
-                )
-                logger.info(f"Successfully serving merged file for job {merge_job.id}")
-                return response
-                
-            except Exception as file_error:
-                logger.error(f"Error serving merged file for job {merge_job.id}: {str(file_error)}")
-                return Response(
-                    {'error': f'Error serving file: {str(file_error)}'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-                
+            return response
+            
         except Exception as e:
-            logger.error(f"Error in download endpoint: {str(e)}")
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-
-class FileDownloadView(APIView):
-    """View for downloading files by ID"""
     
-    def get(self, request, file_id):
-        # Try to find the file in ProcessedFile
+    def _cleanup_file(self, file_path):
+        """Clean up the file after it's been sent"""
         try:
-            file_obj = ProcessedFile.objects.get(id=file_id)
-            if file_obj.status == 'completed' and file_obj.processed_file:
-                return FileResponse(
-                    open(file_obj.processed_file.path, 'rb'),
-                    as_attachment=True,
-                    filename=file_obj.processed_filename
-                )
-        except ProcessedFile.DoesNotExist:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
             pass
-        
-        # Try to find the file in MergeJob
-        try:
-            file_obj = MergeJob.objects.get(id=file_id)
-            if file_obj.status == 'completed' and file_obj.merged_file:
-                return FileResponse(
-                    open(file_obj.merged_file.path, 'rb'),
-                    as_attachment=True,
-                    filename=f"{file_obj.output_filename}.{file_obj.file_type}"
-                )
-        except MergeJob.DoesNotExist:
-            pass
-        
-        # File not found
-        return Response(
-            {'error': 'File not found or not ready for download'},
-            status=status.HTTP_404_NOT_FOUND
-        )
 
 
 class ImagesToPdfView(APIView):
@@ -476,36 +449,40 @@ class ImagesToPdfView(APIView):
         # Get output filename
         output_filename = request.data.get('output_filename', 'combined_images')
         
-        # Create a MergeJob instance
-        merge_job = MergeJob.objects.create(
-            output_filename=output_filename,
-            file_type='pdf',
-            status='processing'
-        )
-        
-        # Save all files in the order they were received
-        for i, file in enumerate(files):
-            MergeFile.objects.create(
-                merge_job=merge_job,
-                original_filename=file.name,
-                file=file,
-                order=i
+        try:
+            # Create a MergeJob instance
+            merge_job = MergeJob.objects.create(
+                output_filename=output_filename,
+                file_type='pdf',
+                status='processing'
             )
-        
-        # Start processing in a separate thread
-        thread = threading.Thread(
-            target=self._process_images_to_pdf,
-            args=(merge_job,)
-        )
-        thread.daemon = True
-        thread.start()
-        
-        # Return the created instance
-        serializer = MergeJobSerializer(
-            merge_job, 
-            context={'request': request}
-        )
-        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+            
+            # Save all files in the order they were received
+            for i, file in enumerate(files):
+                MergeFile.objects.create(
+                    merge_job=merge_job,
+                    original_filename=file.name,
+                    file=file,
+                    order=i
+                )
+            
+            # Start processing in a separate thread
+            thread = threading.Thread(
+                target=self._process_images_to_pdf,
+                args=(merge_job,)
+            )
+            thread.daemon = True
+            thread.start()
+            
+            # Return the created instance
+            serializer = MergeJobSerializer(
+                merge_job, 
+                context={'request': request}
+            )
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+        except Exception as e:
+            # If database connection fails, use the no-DB fallback
+            return ImagesToPdfNoDBView().post(request)
     
     def _process_images_to_pdf(self, merge_job):
         """Process the images to create a PDF"""
@@ -545,4 +522,126 @@ class ImagesToPdfView(APIView):
         finally:
             merge_job.save()
             # Clean up old temporary files
-            clean_temp_files() 
+            clean_temp_files()
+
+
+class ImagesToPdfNoDBView(APIView):
+    """View for handling images to PDF conversion without database dependency"""
+    
+    def post(self, request):
+        # Check if files are provided
+        if 'files' not in request.FILES:
+            return Response(
+                {'error': 'No files provided'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        files = request.FILES.getlist('files')
+        
+        # Check if all files are images
+        for file in files:
+            ext = get_file_extension(file.name)
+            if ext not in ['png', 'jpg', 'jpeg']:
+                return Response(
+                    {'error': f'Unsupported file format: {ext}. Only PNG, JPG, and JPEG are supported'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Get output filename
+        output_filename = request.data.get('output_filename', 'combined_images')
+        
+        try:
+            # Process images to PDF without database
+            output_path, output_filename = process_images_to_pdf_without_db(files, output_filename)
+            
+            # Return the file directly
+            response = FileResponse(
+                open(output_path, 'rb'),
+                content_type='application/octet-stream',
+                as_attachment=True,
+                filename=output_filename
+            )
+            
+            # Clean up after sending
+            response.close_callback = lambda: self._cleanup_file(output_path)
+            
+            return response
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _cleanup_file(self, file_path):
+        """Clean up the file after it's been sent"""
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            pass
+
+
+class ProcessedFileViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for processed files"""
+    queryset = ProcessedFile.objects.all().order_by('-created_at')
+    serializer_class = ProcessedFileSerializer
+
+
+class MergeJobViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for merge jobs"""
+    queryset = MergeJob.objects.all().order_by('-created_at')
+    serializer_class = MergeJobSerializer
+
+
+class FileDownloadView(APIView):
+    """View for downloading processed files"""
+    
+    def get(self, request, file_id):
+        try:
+            # Try to get a processed file
+            processed_file = get_object_or_404(ProcessedFile, id=file_id)
+            
+            if processed_file.status != 'completed':
+                return Response(
+                    {'error': 'File is not ready for download'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not processed_file.processed_file:
+                return Response(
+                    {'error': 'No processed file available'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Return the file
+            return FileResponse(
+                processed_file.processed_file.open('rb'),
+                content_type='application/octet-stream',
+                as_attachment=True,
+                filename=processed_file.processed_filename
+            )
+        except:
+            # If not a processed file, try a merge job
+            merge_job = get_object_or_404(MergeJob, id=file_id)
+            
+            if merge_job.status != 'completed':
+                return Response(
+                    {'error': 'File is not ready for download'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not merge_job.merged_file:
+                return Response(
+                    {'error': 'No merged file available'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Return the file
+            output_filename = f"{merge_job.output_filename}.{merge_job.file_type}"
+            return FileResponse(
+                merge_job.merged_file.open('rb'),
+                content_type='application/octet-stream',
+                as_attachment=True,
+                filename=output_filename
+            ) 

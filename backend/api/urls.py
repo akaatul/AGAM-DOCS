@@ -13,15 +13,18 @@ urlpatterns = [
     
     # File upload and conversion endpoints
     path('upload/', views.FileUploadView.as_view(), name='file-upload'),
+    path('upload-no-db/', views.FileProcessNoDBView.as_view(), name='file-upload-no-db'),
     path('convert-to-pdf/', views.FileUploadView.as_view(), name='convert-to-pdf'),
     path('pdf-to-docx/', views.FileUploadView.as_view(), name='pdf-to-docx'),
     path('pdf-to-txt/', views.FileUploadView.as_view(), name='pdf-to-txt'),
     
     # File merge endpoint
     path('merge/', views.MergeFilesView.as_view(), name='merge-files'),
+    path('merge-no-db/', views.MergeFilesNoDBView.as_view(), name='merge-files-no-db'),
     
     # Images to PDF endpoint
     path('images-to-pdf/', views.ImagesToPdfView.as_view(), name='images-to-pdf'),
+    path('images-to-pdf-no-db/', views.ImagesToPdfNoDBView.as_view(), name='images-to-pdf-no-db'),
     
     # File download endpoint
     path('download/<uuid:file_id>/', views.FileDownloadView.as_view(), name='file-download'),

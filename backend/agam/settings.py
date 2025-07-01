@@ -74,6 +74,15 @@ DATABASES = {
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
         'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        'CONN_MAX_AGE': 600,  # Connection persistence in seconds
+        'CONN_HEALTH_CHECKS': True,  # Check connection health before using
+        'OPTIONS': {
+            'connect_timeout': 5,  # Connection timeout in seconds
+            'keepalives': 1,  # Enable TCP keepalives
+            'keepalives_idle': 30,  # Seconds before sending keepalive
+            'keepalives_interval': 10,  # Seconds between keepalives
+            'keepalives_count': 5,  # Number of keepalives before dropping
+        },
     }
 }
 
