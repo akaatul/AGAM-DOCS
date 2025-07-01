@@ -6,6 +6,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.db import connection
 
 from .models import ProcessedFile, MergeJob, MergeFile
 from .serializers import (
@@ -644,4 +645,36 @@ class FileDownloadView(APIView):
                 content_type='application/octet-stream',
                 as_attachment=True,
                 filename=output_filename
-            ) 
+            )
+
+
+class HealthCheckView(APIView):
+    """View for checking the health of the application and database connection"""
+    
+    def get(self, request):
+        # Check database connection
+        db_status = "connected"
+        db_error = None
+        
+        try:
+            # Attempt a simple database query
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+        except Exception as e:
+            db_status = "disconnected"
+            db_error = str(e)
+        
+        # Return health status
+        response_data = {
+            "status": "healthy" if db_status == "connected" else "unhealthy",
+            "database": {
+                "status": db_status,
+                "error": db_error
+            },
+            "api": "online"
+        }
+        
+        status_code = status.HTTP_200_OK if db_status == "connected" else status.HTTP_503_SERVICE_UNAVAILABLE
+        
+        return Response(response_data, status=status_code) 

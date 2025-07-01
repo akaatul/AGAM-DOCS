@@ -11,6 +11,9 @@ urlpatterns = [
     # Include router URLs
     path('', include(router.urls)),
     
+    # Health check
+    path('health/', views.HealthCheckView.as_view(), name='health-check'),
+    
     # File upload and conversion endpoints
     path('upload/', views.FileUploadView.as_view(), name='file-upload'),
     path('upload-no-db/', views.FileProcessNoDBView.as_view(), name='file-upload-no-db'),

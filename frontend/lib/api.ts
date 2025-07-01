@@ -1,13 +1,16 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://agam-backend.onrender.com/api';
-
+// API client setup
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: apiBaseUrl,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
+  withCredentials: true
 });
 
 export interface ProcessedFile {
