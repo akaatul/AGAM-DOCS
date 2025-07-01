@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaObjectGroup, FaFileAlt, FaHeart, FaExclamationTriangle } from 'react-icons/fa';
+import { FaObjectGroup, FaFileAlt, FaHeart, FaExclamationTriangle, FaFilePdf, FaFileWord, FaFilePowerpoint, FaDownload } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -159,27 +159,58 @@ export default function MergePage() {
   };
   
   const handleDownload = (job: MergeJob) => {
-    if (!job.download_url) {
-      toast.error('Download URL not available');
+    if (!job || !job.id) {
+      toast.error('No file available to download');
       return;
     }
     
     setDownloadingJobId(job.id);
     
     try {
-      // Create a link and trigger download
-      const link = document.createElement('a');
-      link.href = job.download_url;
-      link.download = `${job.output_filename}.${job.file_type}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast.success('Download started');
+      // For direct download response from the fallback API
+      if (job.id === 'direct-download' && job.merged_file) {
+        // The file has already been downloaded via the fallback mechanism
+        toast.success('File already downloaded');
+        setDownloadingJobId(null);
+        return;
+      }
+
+      // Get the file using the download endpoint
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/download/${job.id}/`, {
+        // Don't include credentials for CORS requests
+        credentials: 'omit',
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to download file: ${response.statusText}`);
+        }
+        return response.blob();
+      })
+      .then(blob => {
+        // Create a download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        
+        // Use the output filename with the correct extension
+        const filename = `${job.output_filename}.${job.file_type}`;
+        
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toast.success('Download started');
+        setDownloadingJobId(null);
+      })
+      .catch(error => {
+        console.error('Error downloading file:', error);
+        toast.error('Failed to download file: ' + (error.message || 'Unknown error'));
+        setDownloadingJobId(null);
+      });
     } catch (error) {
-      console.error('Error downloading file:', error);
-      toast.error('Failed to download file');
-    } finally {
+      console.error('Error initiating download:', error);
+      toast.error('Failed to initiate download');
       setDownloadingJobId(null);
     }
   };
@@ -256,26 +287,15 @@ export default function MergePage() {
               
               <div className="space-y-4">
                 {mergeJobs.map(job => (
-                  <motion.div 
-                    key={job.id}
-                    className="bg-white rounded-lg shadow-md p-4 border-2 border-primary-200"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                  >
-                    <div className="flex items-center justify-between mb-3">
+                  <div className="bg-white p-4 rounded-xl shadow-md border-2 border-primary-200 transition-colors hover:border-primary-300 mb-4">
+                    <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center">
-                        <div className="text-3xl mr-3">
-                          <FaObjectGroup className="text-primary-500" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-medium text-primary-600 font-cursive">
-                            {job.output_filename}.{job.file_type}
-                          </h3>
-                          <p className="text-sm text-gray-500">
-                            {job.files.length} files merged
-                          </p>
-                        </div>
+                        {job.file_type === 'pdf' && <FaFilePdf className="text-2xl text-primary-500 mr-3" />}
+                        {job.file_type === 'docx' && <FaFileWord className="text-2xl text-primary-500 mr-3" />}
+                        {job.file_type === 'pptx' && <FaFilePowerpoint className="text-2xl text-primary-500 mr-3" />}
+                        <h3 className="text-lg font-medium text-primary-600 font-cursive" title={`${job.output_filename}.${job.file_type}`}>
+                          {job.output_filename}.{job.file_type}
+                        </h3>
                       </div>
                       <div className={`px-2 py-1 rounded-full text-xs font-medium ${
                         job.status === 'completed' ? 'bg-green-100 text-green-800' :
@@ -287,65 +307,23 @@ export default function MergePage() {
                       </div>
                     </div>
                     
-                    {job.status === 'processing' && (
-                      <div className="flex items-center justify-center p-3 bg-primary-50 rounded-lg">
-                        <motion.div
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ duration: 1.5, repeat: Infinity }}
-                          className="text-primary-500 mr-2"
-                        >
-                          <FaHeart />
-                        </motion.div>
-                        <span className="text-primary-700">Processing your files...</span>
-                      </div>
-                    )}
+                    <div className="text-sm text-gray-600 mb-4">
+                      {job.files.length} files merged • {new Date(job.created_at).toLocaleString()}
+                    </div>
                     
-                    {job.status === 'failed' && (
-                      <div className="p-3 bg-red-50 rounded-lg">
-                        <p className="text-red-700 text-sm">
-                          Error: {job.error_message || 'An unknown error occurred'}
-                        </p>
-                        <div className="mt-2">
-                          <Button 
-                            onClick={() => setFiles([])}
-                            size="sm"
-                            variant="valentine"
-                            className="text-xs"
-                          >
-                            Try Again
-                          </Button>
-                        </div>
-                      </div>
+                    {job.status === 'completed' && (
+                      <Button
+                        onClick={() => handleDownload(job)}
+                        isLoading={downloadingJobId === job.id}
+                        className="w-full"
+                        size="sm"
+                        variant="valentine"
+                      >
+                        <FaDownload className="mr-2" />
+                        Download
+                      </Button>
                     )}
-                    
-                    {job.status === 'completed' && job.download_url && (
-                      <div className="mt-3">
-                        <Button
-                          onClick={() => handleDownload(job)}
-                          isLoading={downloadingJobId === job.id}
-                          className="w-full"
-                          size="sm"
-                          variant="valentine"
-                        >
-                          <FaFileAlt className="mr-2" />
-                          Download Merged File
-                        </Button>
-                      </div>
-                    )}
-                    
-                    {job.files.length > 0 && (
-                      <div className="mt-3">
-                        <h4 className="text-sm font-medium text-gray-700 mb-1">Files included:</h4>
-                        <ul className="text-xs text-gray-500 list-disc list-inside">
-                          {job.files.map(file => (
-                            <li key={file.id} className="truncate">
-                              {file.original_filename}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             </section>

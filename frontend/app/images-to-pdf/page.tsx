@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FaImage, FaFilePdf, FaServer, FaLaptop } from 'react-icons/fa';
+import { FaImage, FaFilePdf, FaServer, FaLaptop, FaDownload } from 'react-icons/fa';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import FileDropzone from '@/components/FileDropzone';
@@ -102,24 +102,58 @@ export default function ImagesToPdfPage() {
   };
   
   const handleDownload = () => {
-    if (!mergeJob?.download_url) return;
+    if (!mergeJob || !mergeJob.id) {
+      toast.error('No PDF available to download');
+      return;
+    }
     
     setIsDownloading(true);
     
     try {
-      // Create a link and trigger download
-      const link = document.createElement('a');
-      link.href = mergeJob.download_url;
-      link.download = `${mergeJob.output_filename}.${mergeJob.file_type}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast.success('Download started');
+      // For direct download response from the fallback API
+      if (mergeJob.id === 'direct-download' && mergeJob.merged_file) {
+        // The file has already been downloaded via the fallback mechanism
+        toast.success('File already downloaded');
+        setIsDownloading(false);
+        return;
+      }
+
+      // Get the file using the download endpoint
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/download/${mergeJob.id}/`, {
+        // Don't include credentials for CORS requests
+        credentials: 'omit',
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to download file: ${response.statusText}`);
+        }
+        return response.blob();
+      })
+      .then(blob => {
+        // Create a download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        
+        // Use the output filename with the correct extension
+        let filename = `${mergeJob.output_filename}.${mergeJob.file_type}`;
+        
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toast.success('Download started');
+        setIsDownloading(false);
+      })
+      .catch(error => {
+        console.error('Error downloading file:', error);
+        toast.error('Failed to download file: ' + (error.message || 'Unknown error'));
+        setIsDownloading(false);
+      });
     } catch (error) {
-      console.error('Error downloading file:', error);
-      toast.error('Failed to download file');
-    } finally {
+      console.error('Error initiating download:', error);
+      toast.error('Failed to initiate download');
       setIsDownloading(false);
     }
   };
@@ -304,13 +338,14 @@ export default function ImagesToPdfPage() {
                   </div>
                 )}
                 
-                {mergeJob.status === 'completed' && mergeJob.download_url && (
+                {mergeJob && mergeJob.status === 'completed' && (
                   <Button
                     onClick={handleDownload}
                     isLoading={isDownloading}
-                    className="w-full mt-3"
+                    className="w-full"
+                    variant="valentine"
                   >
-                    <FaFilePdf className="mr-2" />
+                    <FaDownload className="mr-2" />
                     Download PDF
                   </Button>
                 )}

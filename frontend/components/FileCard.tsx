@@ -239,7 +239,7 @@ export default function FileCard(props: FileCardProps) {
           </div>
         )}
         
-        {file.status === 'completed' && file.download_url && (
+        {file.status === 'completed' && (
           <div className="mt-3">
             <Button
               onClick={() => onDownload(file)}
