@@ -223,69 +223,21 @@ For containerized deployment:
 
 3. For production, modify the Docker Compose file to use production settings
 
-# AGAM Valentine's Theme
+# AGAM - Document Conversion Web App
 
-A heartwarming and enchanting Valentine-themed website for AGAM document conversion services.
+AGAM is a web application that provides various document conversion features.
 
 ## Features
+- Convert various file formats to PDF
+- Convert PDF to DOCX, TXT, and PPTX
+- Merge multiple PDFs into one
+- Convert multiple images to a single PDF
 
-### Navigation Design
-- Floating heart-shaped navbar that gently pulses with scroll
-- Menu items transform into floating love letters on hover
-- Navigation text in romantic cursive with sparkly underlines
-- Heart-shaped cursor that leaves trailing sparkles
-- Floating cupid arrows and tiny hearts that follow mouse movement
-- Mobile menu unfolds like a Valentine's card with flutter animation
+## Architecture
+- Frontend: Next.js with TypeScript
+- Backend: Django REST Framework
+- Database: PostgreSQL (with fallback for database-free operation)
 
-### Landing Page Elements
-- **Hero Section:**
-  * Animated love birds and butterflies that flutter across the screen
-  * Love-letter style value proposition with golden ink effects
-  * "Made with Love, No Ads" heart badge with gentle rotation
-  * Floating heart balloons with parallax movement
-  * Soft rose petal animations falling in background
-
-- **Features Showcase:**
-  * Heart-shaped feature cards with ribbon borders
-  * Cute love-themed icons (hearts, cupids, roses)
-  * Features appear with love letter unfolding animation
-  * Section dividers as lace patterns and ribbon designs
-
-- **Testimonials Area:**
-  * Heart-shaped testimonial bubbles
-  * Adorable couple avatars with sweet interactions
-  * Reviews float on cloud-shaped cards
-  * Background with subtle floating hearts pattern
-
-- **Call-to-Action Sections:**
-  * Heart-shaped buttons with love potion glow effect
-  * Animated Cupid's arrows pointing to CTAs
-  * Love letter envelopes that open on hover
-  * Romantic gradient transitions
-
-### Visual Style Guide
-- **Primary Color:** Sweet pink (#FFD1DC)
-- **Secondary Colors:**
-  * Rose red (#FF8BA7)
-  * Soft lavender (#E6E6FA)
-  * Golden accent (#FFD700)
-- **Typography:** Romantic script fonts paired with sweet rounded sans-serif
-- **Love-letter and Valentine's card aesthetic throughout**
-
-### Technical Features
-- Smooth love-themed animations using Framer Motion
-- Heart-beat loading animations
-- Mobile-responsive love theme adaptations
-- Gentle chime sounds for interactions (user-activated)
-- Optimized romantic imagery loading
-- Accessible love-themed elements
-
-### Micro-interactions
-- Buttons bloom like roses on hover
-- Form fields decorated with heart indicators
-- Loading spinners as rotating heart animations
-- Love-letter unfold effects on scroll
-- Hidden Valentine's Day themed surprises throughout
 
 ## Getting Started
 
@@ -314,12 +266,12 @@ cd ../backend
 pip install -r requirements.txt
 ```
 
-3. Add sound files:
-   - Download a chime sound effect and place it in `frontend/public/sounds/chime.mp3`
-   - You can find free sounds at:
-     - https://soundbible.com/1598-Electronic-Chime.html
-     - https://freesound.org/people/BristolStories/sounds/51710/
-     - https://soundjax.com/chime-1.html
+3. Configure environment variables:
+   - Create `.env.local` in the frontend directory with:
+     ```
+     NEXT_PUBLIC_API_URL=http://localhost:8000/api
+     ```
+   - Create `.env` in the backend directory with your database settings
 
 4. Start the development servers:
 ```bash
@@ -338,10 +290,10 @@ python manage.py runserver
 
 ## Implementation Notes
 
-- The Valentine's theme uses custom CSS animations and Framer Motion for interactive elements
-- Font imports are handled in `globals.css` with Google Fonts
-- Sound effects are optional and only play on user interaction
-- The theme is fully responsive and works on mobile devices
+- The application uses a responsive design with Tailwind CSS
+- Backend implements direct streaming responses for improved performance
+- Automatic fallback to database-free mode when database is unavailable
+- Health check endpoint for monitoring application status
 
 ## License
 
@@ -349,6 +301,31 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-- Framer Motion for animation capabilities
-- React Icons for the heart and other Valentine's themed icons
-- Google Fonts for the cursive font family 
+- Next.js for the frontend framework
+- Django for the backend framework
+- Various document conversion libraries that make this application possible
+
+## Database-Free Operation Mode
+
+The application now includes a database-free operation mode that activates automatically when the database connection is unavailable.
+
+### Key Features of Database-Free Mode:
+
+1. **Direct File Processing**
+   - Files are processed and streamed directly back to the user without database storage
+   - All API endpoints use streaming responses to immediately return processed files
+   - No temporary storage of files in the database
+
+2. **Optimized Performance**
+   - Reduced latency by skipping database operations
+   - Files are cleaned up automatically after being sent to the client
+   - Comprehensive logging helps track operation progress and troubleshoot issues
+
+3. **API Endpoints**
+   - All core functionality works without requiring database access:
+     - `/upload/` - File conversion operations
+     - `/merge/` - Merge multiple files 
+     - `/images-to-pdf/` - Convert images to PDF
+   - Health check endpoint `/health/` for monitoring database status
+
+This mode ensures the application remains functional even during database outages or connectivity issues, providing a seamless experience for users. 
