@@ -10,8 +10,22 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  withCredentials: true
+  // For CORS requests, set to false unless you need to send cookies
+  withCredentials: false
 });
+
+// Add response interceptor for error handling
+apiClient.interceptors.response.use(
+  response => response,
+  error => {
+    // Log CORS errors for debugging
+    if (error.message === 'Network Error') {
+      console.error('CORS or network error:', error);
+      console.log('Check if backend CORS settings are properly configured');
+    }
+    return Promise.reject(error);
+  }
+);
 
 export interface ProcessedFile {
   id: string;
@@ -93,6 +107,10 @@ export const convertPdfToPptx = async (file: File): Promise<ProcessedFile> => {
 export const convertExcelToPdf = async (file: File): Promise<ProcessedFile> => {
   return uploadFile(file, 'convert_to_pdf');
 };
+
+// For backward compatibility with existing code
+export const convertPdfToDocx = pdfToDocx;
+export const convertPdfToTxt = pdfToTxt;
 
 // File merging functions
 export const mergeFiles = async (files: File[], outputFilename: string): Promise<MergeJob> => {

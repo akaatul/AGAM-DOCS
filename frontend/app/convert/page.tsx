@@ -8,7 +8,15 @@ import Footer from '@/components/Footer';
 import FileDropzone from '@/components/FileDropzone';
 import Button from '@/components/Button';
 import FileCard from '@/components/FileCard';
-import { convertToPdf, convertPdfToDocx, convertPdfToTxt, convertPdfToPptx, convertExcelToPdf, checkProcessedFileStatus, ProcessedFile } from '@/lib/api';
+import { 
+  convertToPdf, 
+  convertPdfToDocx, 
+  convertPdfToTxt, 
+  convertPdfToPptx, 
+  convertExcelToPdf, 
+  checkProcessedFileStatus, 
+  ProcessedFile 
+} from '@/lib/api';
 import { getFileExtension } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -191,34 +199,51 @@ export default function ConvertPage() {
     setIsDownloading(true);
     
     try {
-      // First check the current status of the file to get the latest download_url
-      let fileWithUrl = processedFile;
+      // For direct download response from the fallback API
+      if (processedFile.id === 'direct-download' && processedFile.processed_file) {
+        // The file has already been downloaded via the fallback mechanism
+        toast.success('File already downloaded');
+        setIsDownloading(false);
+        return;
+      }
+
+      // Get the file using the download endpoint
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/download/${processedFile.id}/`, {
+        // Don't include credentials for CORS requests
+        credentials: 'omit',
+      });
       
-      if (!processedFile.download_url) {
-        try {
-          // Fetch the latest status to get the download_url
-          fileWithUrl = await checkProcessedFileStatus(processedFile.id);
-        } catch (e) {
-          console.error('Error fetching file status:', e);
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.statusText}`);
+      }
+      
+      // Get the blob data
+      const blob = await response.blob();
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      
+      // Use the processed filename with the correct extension
+      let filename = '';
+      
+      // Try to get filename from content-disposition header
+      const contentDisposition = response.headers.get('content-disposition');
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1];
         }
       }
       
-      // Get the download URL from the processed file's media URL
-      const downloadUrl = fileWithUrl.download_url;
-      
-      if (!downloadUrl) {
-        throw new Error('File is not ready for download yet. Please wait for processing to complete.');
+      // Fallback to using the processed filename or generated name
+      if (!filename) {
+        filename = processedFile.processed_filename || 
+                  `${processedFile.original_filename.split('.')[0]}.${getCorrectFileExtension(processedFile)}`;
       }
       
-      console.log('Using download URL:', downloadUrl);
-      
-      // Create a link and trigger download
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      
-      // Use the processed filename with the correct extension
-      const filename = processedFile.processed_filename || `${processedFile.original_filename.split('.')[0]}.${getCorrectFileExtension(processedFile)}`;
-      link.download = filename;
+      link.href = url;
+      link.setAttribute('download', filename);
       
       document.body.appendChild(link);
       link.click();
